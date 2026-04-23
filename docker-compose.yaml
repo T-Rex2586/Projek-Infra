@@ -14,7 +14,7 @@ x-airflow-common:
     - AIRFLOW_CONN_DWH_CONN=postgresql://airflow:airflow@postgres:5432/dwh
 
     # 🔥 DEPENDENCIES
-    - _PIP_ADDITIONAL_REQUIREMENTS=pandas>=2.0.0 requests>=2.31.0 psycopg2-binary>=2.9.9 scrapy>=2.11.0 scrapy-playwright playwright itemadapter
+    - _PIP_ADDITIONAL_REQUIREMENTS=pandas>=2.0.0 requests>=2.31.0 psycopg2-binary>=2.9.9 scrapy>=2.11.0 scrapy-playwright playwright itemadapter scrapy-fake-useragent
 
     # 🔥 Playwright path
     - PLAYWRIGHT_BROWSERS_PATH=/opt/airflow/.cache/ms-playwright
@@ -23,6 +23,8 @@ x-airflow-common:
     - ./dags:/opt/airflow/dags
     - ./data:/opt/airflow/data
     - ./freya:/opt/airflow/freya
+    - ./logs:/opt/airflow/logs
+    - playwright_cache:/opt/airflow/.cache/ms-playwright
 
   depends_on:
     postgres:
@@ -55,34 +57,26 @@ services:
     command: >
       bash -c "
       airflow db migrate &&
-      airflow users list | grep admin || airflow users create \
-        --username admin \
-        --password admin \
-        --firstname Admin \
-        --lastname User \
-        --role Admin \
-        --email admin@example.com &&
+      (airflow users list | grep admin || airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com) &&
       playwright install chromium || true
       "
 
 
-  # 🌐 AIRFLOW WEBSERVER
+# 🌐 AIRFLOW WEBSERVER
   airflow-webserver:
-    <<: *airflow-common
-    command: webserver
-    ports:
-      - "8089:8080"
-    depends_on:
-      - airflow-init
-
+   <<: *airflow-common
+   hostname: airflow-webserver
+   command: webserver
+   ports:
+       - "8089:8080"
 
   # 🧠 AIRFLOW SCHEDULER
   airflow-scheduler:
-    <<: *airflow-common
-    command: scheduler
-    depends_on:
-      - airflow-init
-
+   <<: *airflow-common
+   hostname: airflow-scheduler
+   command: scheduler
+   depends_on:
+       - airflow-init
 
   # 📊 METABASE
   metabase:
@@ -102,3 +96,4 @@ services:
 volumes:
   postgres_data:
   metabase_data:
+  playwright_cache:

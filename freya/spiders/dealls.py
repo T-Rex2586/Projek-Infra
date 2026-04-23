@@ -13,7 +13,7 @@ class DeallsSpiderJson(scrapy.Spider):
     name = 'dealls'
     BASE_URL = 'https://api.sejutacita.id/v1/explore-job/job'
     JOBS_PER_PAGE = 18
-    MAX_PAGES = 20  # Naikkan dari 5 ke 20
+    MAX_PAGES = 500  # Dinaikkan ke 500 untuk scraping skala besar
 
     custom_settings = {
         'ROBOTSTXT_OBEY': False,

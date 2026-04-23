@@ -95,11 +95,19 @@ def master_job_pipeline():
     task_mekari = create_playwright_task('mekari')
     task_vidio = create_playwright_task('vidio')
     task_glints = create_playwright_task('glints')
+    task_kitalulus = create_playwright_task('kitalulus')
+
+    # ============================================================
+    # 📋 SCRAPING TASKS - Courses
+    # ============================================================
+    task_dicoding_course = create_scrapy_task('dicoding_course')
+    task_buildwithangga = create_scrapy_task('buildwithangga')
 
     # 🔥 ETL TASK
     @task()
     def process_and_load_data():
         all_jobs = []
+        all_courses = []
 
         # ============================================================
         # 📥 PHASE 1: INGESTION
@@ -117,9 +125,12 @@ def master_job_pipeline():
                         if not line:
                             continue
                         try:
-                            job = json.loads(line)
-                            if job and isinstance(job, dict) and job.get('job_url'):
-                                all_jobs.append(job)
+                            item = json.loads(line)
+                            if item and isinstance(item, dict):
+                                if item.get('is_course'):
+                                    all_courses.append(item)
+                                elif item.get('job_url'):
+                                    all_jobs.append(item)
                         except json.JSONDecodeError as e:
                             logging.warning(f"JSON error in {file_path} line {line_num}: {e}")
             except Exception as e:
@@ -342,6 +353,48 @@ def master_job_pipeline():
                 conn.commit()
                 logging.info(f"🎉 SUCCESS: {len(job_records)} jobs + {len(skill_records)} skills loaded to DWH")
 
+                # ============================================================
+                # 📤 PHASE 3B: LOAD COURSES
+                # ============================================================
+                if all_courses:
+                    course_df = pd.DataFrame(all_courses)
+                    course_df.drop_duplicates(subset=['course_url'], inplace=True)
+                    
+                    def clean_course_price(val):
+                        try:
+                            s = str(val).lower().replace('rp', '').replace('.', '').replace(',', '').strip()
+                            if 'gratis' in s or 'free' in s or not s:
+                                return 0.0
+                            nums = re.findall(r'\d+', s)
+                            return float(nums[0]) if nums else 0.0
+                        except:
+                            return 0.0
+
+                    course_df['price_numeric'] = course_df['price'].apply(clean_course_price)
+                    
+                    insert_course_query = """
+                        INSERT INTO it_courses (
+                            course_title, provider, course_url, price, course_level, instructor
+                        )
+                        VALUES %s
+                        ON CONFLICT (course_url) DO UPDATE SET
+                            scraped_at = CURRENT_TIMESTAMP,
+                            price = EXCLUDED.price
+                    """
+                    
+                    course_records = [(
+                        str(c.get('course_title', ''))[:250],
+                        str(c.get('provider', ''))[:100],
+                        str(c.get('course_url', '')),
+                        c.get('price_numeric', 0.0),
+                        str(c.get('course_level', ''))[:50],
+                        str(c.get('instructor', ''))[:100],
+                    ) for c in course_df.to_dict('records')]
+                    
+                    execute_values(cur, insert_course_query, course_records)
+                    logging.info(f"✅ Inserted/Updated {len(course_records)} course records")
+                    conn.commit()
+
         except Exception as e:
             conn.rollback()
             logging.error(f"❌ DB ERROR: {e}")
@@ -370,6 +423,9 @@ def master_job_pipeline():
         task_mekari,
         task_vidio,
         task_glints,
+        task_kitalulus,
+        task_dicoding_course,
+        task_buildwithangga,
     ]
 
     all_scrapers >> process_and_load_data()

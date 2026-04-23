@@ -13,7 +13,7 @@ class JobstreetSpider(scrapy.Spider):
     name = 'jobstreet'
     # 🔥 Endpoint baru: SEEK GraphQL (Jobstreet sudah migrasi ke SEEK platform 2026)
     GRAPHQL_URL = 'https://xapi.supercharge-srp.co/job-search/graphql?country=id&is498SmartSortABEnabled=false'
-    MAX_PAGES = 20
+    MAX_PAGES = 500
     JOBS_PER_PAGE = 30
 
     custom_settings = {

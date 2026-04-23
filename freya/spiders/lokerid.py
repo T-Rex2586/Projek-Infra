@@ -1,8 +1,6 @@
 import scrapy
-import json
 from datetime import datetime
 import logging
-import re
 from typing import Dict, Any, Optional
 from scrapy_playwright.page import PageMethod
 from freya.pipelines import calculate_job_age
@@ -10,17 +8,16 @@ from freya.utils import calculate_job_apply_end_date
 
 logger = logging.getLogger(__name__)
 
-class GlintsSpider(scrapy.Spider):
-    name = 'glints'
-    BASE_URL = 'https://glints.com'
-    # Gunakan URL halaman biasa, Playwright akan render JS
-    SEARCH_URL = '{base}/id/opportunities/jobs/explore?keyword=data&country=ID&locationName=All+Cities%2FProvinces&lopiOnly=true&sortBy=LATEST&page={page}'
-
+class LokeridSpider(scrapy.Spider):
+    name = 'lokerid'
+    BASE_URL = 'https://www.loker.id'
+    SEARCH_URL = 'https://www.loker.id/cari-lowongan-kerja/page/{page}?q=IT'
+    
     MAX_PAGES = 500
 
     custom_settings = {
         'ROBOTSTXT_OBEY': False,
-        'DOWNLOAD_DELAY': 3.0,
+        'DOWNLOAD_DELAY': 2.0,
     }
 
     def __init__(self, *args, **kwargs):
@@ -29,102 +26,88 @@ class GlintsSpider(scrapy.Spider):
 
     def start_requests(self):
         for page in range(1, self.MAX_PAGES + 1):
-            url = self.SEARCH_URL.format(base=self.BASE_URL, page=page)
             yield scrapy.Request(
-                url,
+                self.SEARCH_URL.format(page=page),
                 meta={
                     "playwright": True,
                     "playwright_page_methods": [
-                        PageMethod("wait_for_timeout", 3000),
+                        PageMethod("wait_for_timeout", 5000)
                     ]
                 },
                 callback=self.parse,
-                errback=self.errback,
-                dont_filter=True,
+                errback=self.errback
             )
 
     def parse(self, response):
         try:
-            # Extract job cards from rendered HTML
-            job_cards = response.css('div[class*="JobCard"] a[href*="/opportunities/jobs/"]')
-
+            # Menggunakan semua link yang menuju ke loker.id/lowongan-kerja/
+            job_cards = response.css('a[href*="/lowongan-kerja/"]')
+            
             if not job_cards:
-                # Try alternative selectors
-                job_cards = response.css('a[href*="/opportunities/jobs/"]')
+                job_cards = response.css('div.media')
 
-            logger.info(f"Glints: Found {len(job_cards)} job cards on page")
+            logger.info(f"LokerID: Found {len(job_cards)} job links on page")
 
             seen_urls = set()
             for card in job_cards:
                 href = card.css('::attr(href)').get()
-                if not href or '/explore' in href or href in seen_urls:
+                if not href or href in seen_urls or '/page/' in href:
                     continue
+                    
                 seen_urls.add(href)
-
                 item = self.parse_card(card, href)
                 if item:
                     yield item
 
         except Exception as e:
-            logger.error(f"Glints parse error: {e}", exc_info=True)
+            logger.error(f"LokerID parse error: {e}", exc_info=True)
 
     def parse_card(self, card, href) -> Optional[Dict[str, Any]]:
         try:
             first_seen = self.timestamp
             last_seen = self.timestamp
 
-            # Extract text from card
             all_text = card.css('::text').getall()
             all_text = [t.strip() for t in all_text if t.strip()]
 
             job_title = all_text[0] if all_text else 'N/A'
             company = all_text[1] if len(all_text) > 1 else 'N/A'
-            location = all_text[2] if len(all_text) > 2 else 'N/A'
-
-            # Try to extract salary/type from remaining text
-            remaining_text = ' '.join(all_text[3:]) if len(all_text) > 3 else ''
-
-            salary = '0'
-            salary_match = re.search(r'IDR\s*([\d,.]+)', remaining_text)
-            if salary_match:
-                salary = salary_match.group(1).replace('.', '').replace(',', '')
-
-            job_type = 'N/A'
+            location = 'N/A'
+            
             for t in all_text:
-                if any(kw in t.lower() for kw in ['full time', 'part time', 'contract', 'intern', 'freelance']):
-                    job_type = t
+                if 'Kota' in t or 'Kabupaten' in t or 'Jakarta' in t:
+                    location = t
                     break
 
-            job_url = f"{self.BASE_URL}{href}" if not href.startswith('http') else href
-            desc = f"{job_title} {company} {location} {remaining_text}"
+            job_url = href
 
             return {
                 'job_title': self.sanitize(job_title),
                 'job_location': self.sanitize(location),
-                'job_department': 'N/A',
+                'job_department': 'IT',
                 'job_url': job_url,
                 'first_seen': first_seen,
-                'base_salary': salary,
-                'job_type': job_type,
+                'base_salary': '0',
+                'job_type': 'N/A',
                 'job_level': 'N/A',
                 'job_apply_end_date': calculate_job_apply_end_date(last_seen),
                 'last_seen': last_seen,
                 'is_active': 'True',
                 'company': self.sanitize(company),
-                'job_board': 'Glints',
+                'job_board': 'Loker.id',
                 'job_board_url': self.BASE_URL,
                 'job_age': calculate_job_age(first_seen, last_seen),
-                'work_arrangement': 'On-site',
-                'desc': desc
+                'work_arrangement': 'N/A',
+                'desc': f"{job_title} at {company}"
             }
         except Exception as e:
-            logger.error(f"Glints parse_card error: {e}")
+            logger.error(f"LokerID parse_card error: {e}")
             return None
 
     @staticmethod
     def sanitize(s):
         if not s: return 'N/A'
-        return s.replace(',', ' -').strip()
+        return s.replace('\n', ' ').strip()
 
     def errback(self, failure):
-        logger.error(f"Glints request failed: {failure}")
+        logger.error(f"LokerID request failed: {failure}")

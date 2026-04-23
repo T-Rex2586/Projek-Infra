@@ -32,6 +32,19 @@ CREATE TABLE IF NOT EXISTS job_skills (
     skill_name VARCHAR(100) NOT NULL,
     UNIQUE(job_id, skill_name)
 );
+-- ============================================
+-- 📋 Tabel 3: IT Courses
+-- ============================================
+CREATE TABLE IF NOT EXISTS it_courses (
+    course_id SERIAL PRIMARY KEY,
+    course_title VARCHAR(255) NOT NULL,
+    provider VARCHAR(100),
+    course_url TEXT UNIQUE NOT NULL,
+    price NUMERIC(15, 2) DEFAULT 0,
+    course_level VARCHAR(50),
+    instructor VARCHAR(100),
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- ============================================
 -- 📊 View: Insight - Top Skills

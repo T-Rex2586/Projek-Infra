@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class GotoSpiderJson(scrapy.Spider):
     name = 'goto'
-    base_url = 'https://api.tokopedia.com/ent-hris/career/job?company=HoldCo&search=&location=&department='
+    base_url = 'https://api.lever.co/v0/postings/GoToGroup?mode=json'
 
     custom_settings = {
         'ROBOTSTXT_OBEY': False,
@@ -35,16 +35,14 @@ class GotoSpiderJson(scrapy.Spider):
     def parse(self, response):
         try:
             data = json.loads(response.text)
-            items_data = data.get('data', {}).get('items', [])
 
             total = 0
-            for selector in items_data:
-                job_list = selector.get('job_list', [])
-                for job in job_list:
-                    item = self.parse_job(job)
-                    if item:
-                        yield item
-                        total += 1
+            # Lever API returns a list of job postings directly
+            for job in data:
+                item = self.parse_job(job)
+                if item:
+                    yield item
+                    total += 1
 
             logger.info(f"GoTo: Scraped {total} jobs")
 
@@ -63,11 +61,11 @@ class GotoSpiderJson(scrapy.Spider):
             department = categories.get('department', 'N/A') if isinstance(categories, dict) else 'N/A'
             commitment = categories.get('commitment', 'N/A') if isinstance(categories, dict) else 'N/A'
             location = categories.get('location', 'N/A') if isinstance(categories, dict) else 'N/A'
+            team = categories.get('team', 'N/A') if isinstance(categories, dict) else 'N/A'
 
-            urls = job.get('urls', {})
-            job_url = urls.get('show', '') if isinstance(urls, dict) else ''
+            job_url = job.get('hostedUrl', '')
 
-            desc = f"{job_title} {department} {commitment}"
+            desc = f"{job_title} {department} {commitment} {team}".strip()
 
             return {
                 'job_title': job_title,
