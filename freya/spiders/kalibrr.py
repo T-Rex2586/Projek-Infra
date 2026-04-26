@@ -21,8 +21,8 @@ class KalibrrSpiderJson(scrapy.Spider):
         'DOWNLOAD_DELAY': 1.0,
         # Fix: handle non-text response by not using Playwright for this
         'DOWNLOAD_HANDLERS': {
-            "http": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
-            "https": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
+            "http": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+            "https": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
         },
     }
 
@@ -34,11 +34,16 @@ class KalibrrSpiderJson(scrapy.Spider):
         yield scrapy.Request(
             self.BASE_URL.format(0),
             headers={
-                'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                # ✅ Fix: exclude 'br' (Brotli) karena brotli package tidak terinstall
+                # Server akan fallback ke gzip/deflate yang sudah didukung
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'en-US,en;q=0.9',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Referer': 'https://www.kalibrr.com/id-ID/home',
             },
             callback=self.parse,
+            errback=self.errback,
             dont_filter=True,
         )
 
@@ -71,16 +76,22 @@ class KalibrrSpiderJson(scrapy.Spider):
                 yield scrapy.Request(
                     self.BASE_URL.format(next_offset),
                     headers={
-                        'Content-Type': 'application/json',
                         'Accept': 'application/json',
+                        'Accept-Encoding': 'gzip, deflate',
+                        'Accept-Language': 'en-US,en;q=0.9',
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Referer': 'https://www.kalibrr.com/id-ID/home',
                     },
                     callback=self.parse,
+                    errback=self.errback,
                     dont_filter=True,
                 )
 
         except Exception as e:
             logger.error(f"Error parsing Kalibrr: {e}", exc_info=True)
+
+    def errback(self, failure):
+        logger.error(f"Kalibrr request error: {failure.getErrorMessage()}")
 
     def parse_job(self, job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         try:

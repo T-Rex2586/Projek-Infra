@@ -19,8 +19,8 @@ class DeallsSpiderJson(scrapy.Spider):
         'ROBOTSTXT_OBEY': False,
         'DOWNLOAD_DELAY': 1.5,
         'DOWNLOAD_HANDLERS': {
-            "http": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
-            "https": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
+            "http": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+            "https": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
         },
     }
 

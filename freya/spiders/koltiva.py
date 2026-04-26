@@ -16,8 +16,8 @@ class KoltivaSpider(scrapy.Spider):
     custom_settings = {
         'ROBOTSTXT_OBEY': False,
         'DOWNLOAD_HANDLERS': {
-            "http": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
-            "https": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
+            "http": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+            "https": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
         },
     }
 

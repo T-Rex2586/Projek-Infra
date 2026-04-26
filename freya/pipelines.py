@@ -1,12 +1,10 @@
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-
-
-# useful for handling different item types with a single interface
 from itemadapter import ItemAdapter
 from datetime import datetime
+from scrapy.exceptions import DropItem
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def calculate_job_age(first_seen, last_seen):
     try:
@@ -16,30 +14,51 @@ def calculate_job_age(first_seen, last_seen):
         first_seen_date = datetime.strptime(str(first_seen), date_format)
         last_seen_date = datetime.strptime(str(last_seen), date_format)
         diff_days = abs(last_seen_date - first_seen_date).days
-
-        if diff_days <= 1:
-            return 'new'
-        elif 1 < diff_days <= 7:
-            return 'hot'
-        elif 8 <= diff_days <= 15:
-            return 'recent'
-        elif 16 <= diff_days <= 21:
-            return 'aging'
-        elif 22 <= diff_days <= 30:
-            return 'old'
-        else:
-            return 'expired'
+        if diff_days <= 1:    return 'new'
+        elif diff_days <= 7:  return 'hot'
+        elif diff_days <= 15: return 'recent'
+        elif diff_days <= 21: return 'aging'
+        elif diff_days <= 30: return 'old'
+        else:                 return 'expired'
     except (ValueError, TypeError):
         return 'unknown'
 
-class FreyaPipeline:
-    def process_item(self, item, spider):
-        first_seen = item.get('first_seen', '')
-        last_seen = item.get('last_seen', '')
 
-        if first_seen and last_seen:
-            item['job_age'] = calculate_job_age(first_seen, last_seen)
+class FreyaPipeline:
+    """
+    Pipeline utama Freya.
+    ✅ Fix Scrapy 2.15 DeprecationWarning:
+       - open_spider / close_spider / process_item TIDAK boleh punya 'spider' param
+         jika tidak digunakan dari from_crawler
+    """
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        instance = cls()
+        instance.stats = crawler.stats
+        return instance
+
+    # ✅ Tanpa 'spider' parameter — fix DeprecationWarning
+    def open_spider(self):
+        logger.info("FreyaPipeline: Spider opened")
+
+    def close_spider(self):
+        logger.info("FreyaPipeline: Spider closed")
+
+    def process_item(self, item, spider):
+        adapter = ItemAdapter(item)
+
+        # Hitung job_age
+        first_seen = adapter.get('first_seen', '')
+        last_seen  = adapter.get('last_seen', '')
+        adapter['job_age'] = calculate_job_age(first_seen, last_seen) if (first_seen and last_seen) else 'unknown'
+
+        # Validasi minimal
+        if adapter.get('platform'):
+            if not adapter.get('url'):
+                raise DropItem(f"[{spider.name}] Missing url: title={adapter.get('course_title')}")
         else:
-            item['job_age'] = 'unknown'
+            if not adapter.get('job_url'):
+                raise DropItem(f"[{spider.name}] Missing job_url: title={adapter.get('job_title')}")
 
         return item
