@@ -15,9 +15,9 @@ def clean_string(s):
         return 'N/A'
     if not isinstance(s, str):
         s = str(s)
-    # Hapus HTML tags
+
     s = re.sub(r'<[^>]+>', ' ', s)
-    # Hapus newlines dan extra whitespace
+
     s = ' '.join(s.replace('\n', ' ').replace('\r', '').split())
     return s.strip() or 'N/A'
 

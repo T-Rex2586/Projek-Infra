@@ -8,12 +8,11 @@ from freya.utils import calculate_job_apply_end_date
 
 logger = logging.getLogger(__name__)
 
-
 class MekariSpider(scrapy.Spider):
     name = 'mekari'
     BASE_URL = 'https://mekari.com'
     CAREERS_URL = 'https://mekari.com/karir/'
-    # Mekari gunakan Lever API
+
     LEVER_URL = 'https://api.lever.co/v0/postings/mekari?mode=json'
 
     custom_settings = {

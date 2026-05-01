@@ -8,12 +8,11 @@ from freya.utils import calculate_job_apply_end_date
 
 logger = logging.getLogger(__name__)
 
-
 class FlipSpider(scrapy.Spider):
     name = 'flip'
     BASE_URL = 'https://flip.id'
     CAREERS_URL = 'https://flip.id/careers'
-    # ✅ Fix: Flip pakai Greenhouse (bukan Lever)
+
     GREENHOUSE_URL = 'https://boards-api.greenhouse.io/v1/boards/flip/jobs?content=true'
 
     custom_settings = {
@@ -69,18 +68,14 @@ class FlipSpider(scrapy.Spider):
 
             job_title = self.sanitize(job.get('title', 'N/A'))
 
-            # Location
             loc_obj = job.get('location', {})
             location = loc_obj.get('name', 'Indonesia') if isinstance(loc_obj, dict) else 'Indonesia'
 
-            # Department
             depts = job.get('departments', [])
             department = depts[0].get('name', 'N/A') if depts and isinstance(depts[0], dict) else 'N/A'
 
-            # Job URL
             job_url = job.get('absolute_url', f"https://boards.greenhouse.io/flip/jobs/{job.get('id', '')}")
 
-            # Work arrangement from content
             content = job.get('content', '') or ''
             work_arr = 'Remote' if 'remote' in content.lower() else 'Hybrid' if 'hybrid' in content.lower() else 'On-site'
 

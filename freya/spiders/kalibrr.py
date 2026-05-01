@@ -19,7 +19,7 @@ class KalibrrSpiderJson(scrapy.Spider):
     custom_settings = {
         'ROBOTSTXT_OBEY': False,
         'DOWNLOAD_DELAY': 1.0,
-        # Fix: handle non-text response by not using Playwright for this
+
         'DOWNLOAD_HANDLERS': {
             "http": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
             "https": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
@@ -35,8 +35,7 @@ class KalibrrSpiderJson(scrapy.Spider):
             self.BASE_URL.format(0),
             headers={
                 'Accept': 'application/json',
-                # ✅ Fix: exclude 'br' (Brotli) karena brotli package tidak terinstall
-                # Server akan fallback ke gzip/deflate yang sudah didukung
+
                 'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -49,8 +48,7 @@ class KalibrrSpiderJson(scrapy.Spider):
 
     def parse(self, response):
         try:
-            # Fix: response.text gagal karena content-type bukan text
-            # Gunakan response.body decode manual
+
             raw_body = response.body.decode('utf-8', errors='replace')
             data = json.loads(raw_body)
             jobs = data.get('jobs', [])
@@ -66,7 +64,6 @@ class KalibrrSpiderJson(scrapy.Spider):
                 if item:
                     yield item
 
-            # Pagination
             total_jobs = data.get('total', 0)
             current_offset = data.get('offset', 0)
             next_offset = current_offset + len(jobs)
@@ -98,7 +95,6 @@ class KalibrrSpiderJson(scrapy.Spider):
             first_seen = self.timestamp
             last_seen = self.format_datetime(job.get('created_at', ''))
 
-            # Gabungkan teks untuk skill extraction
             desc_raw = strip_html(job.get('description', ''))
             qual_raw = strip_html(job.get('qualifications', ''))
             desc_text = f"{job.get('name', '')} {job.get('function', '')} {desc_raw} {qual_raw}"

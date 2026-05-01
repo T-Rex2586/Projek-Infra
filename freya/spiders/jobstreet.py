@@ -9,7 +9,6 @@ from freya.utils import clean_string
 
 logger = logging.getLogger(__name__)
 
-
 class JobstreetSpider(scrapy.Spider):
     """
     Jobstreet Indonesia spider menggunakan Playwright headless browser.
@@ -93,7 +92,7 @@ class JobstreetSpider(scrapy.Spider):
         page = response.meta.get("playwright_page")
 
         try:
-            # Coba intercept data dari script tags (SSR data)
+
             scripts = response.css('script[type="application/ld+json"]::text').getall()
             jobs_found = 0
 
@@ -120,10 +119,10 @@ class JobstreetSpider(scrapy.Spider):
             if jobs_found > 0:
                 logger.info(f"Jobstreet LD+JSON '{query}': {jobs_found} jobs")
             else:
-                # Fallback: parse job cards dari HTML
+
                 jobs_found = 0
-                # Jobstreet React app menyimpan data di `__NEXT_DATA__` script
-                next_data_script = response.css('script#__NEXT_DATA__::text').get()
+
+                next_data_script = response.css('script[id="__NEXT_DATA__"]::text').get()
                 if next_data_script:
                     try:
                         nd = json.loads(next_data_script)
@@ -138,7 +137,7 @@ class JobstreetSpider(scrapy.Spider):
                         logger.warning(f"Jobstreet __NEXT_DATA__ parse error: {e}")
 
                 if jobs_found == 0:
-                    # Last resort: parse HTML cards
+
                     for item in self._parse_html_cards(response, query):
                         if item['job_url'] not in self.seen_urls:
                             self.seen_urls.add(item['job_url'])
@@ -155,7 +154,7 @@ class JobstreetSpider(scrapy.Spider):
         """Extract jobs from Next.js __NEXT_DATA__ script."""
         results = []
         try:
-            # Navigate to job data within Next.js page props
+
             props = (
                 data.get('props', {})
                     .get('pageProps', {})
@@ -221,7 +220,7 @@ class JobstreetSpider(scrapy.Spider):
 
     def _parse_html_cards(self, response, query):
         """Parse HTML job cards - selector confirmed via debug."""
-        # article[data-testid="job-card"] confirmed: 32 items per page
+
         cards = response.css('article[data-testid="job-card"]')
         if not cards:
             cards = response.css('article')
@@ -231,7 +230,7 @@ class JobstreetSpider(scrapy.Spider):
 
         for card in cards:
             try:
-                # Links with /id/job/ - origin=cardTitle has the title text
+
                 title_link = card.css('a[href*="/id/job/"][href*="cardTitle"]')
                 if not title_link:
                     title_link = card.css('a[href*="/id/job/"]')
@@ -247,7 +246,6 @@ class JobstreetSpider(scrapy.Spider):
                         or 'N/A'
                     )
 
-                # Clean URL - strip tracking params
                 job_url = href if href.startswith('http') else (self.BASE_URL + href if href else '')
                 if '?' in job_url:
                     job_url = job_url.split('?')[0]

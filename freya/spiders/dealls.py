@@ -13,7 +13,7 @@ class DeallsSpiderJson(scrapy.Spider):
     name = 'dealls'
     BASE_URL = 'https://api.sejutacita.id/v1/explore-job/job'
     JOBS_PER_PAGE = 18
-    MAX_PAGES = 20  # Naikkan dari 5 ke 20
+    MAX_PAGES = 20
 
     custom_settings = {
         'ROBOTSTXT_OBEY': False,
@@ -101,7 +101,6 @@ class DeallsSpiderJson(scrapy.Spider):
             last_seen_raw = job.get('latestUpdatedAt') or job.get('createdAt', '')
             last_seen = self.format_datetime(last_seen_raw) if last_seen_raw else first_seen
 
-            # Gabungkan teks untuk skill extraction
             full_desc = f"{job.get('role', '')} {job.get('description', '')}"
 
             city_obj = job.get('city', {})

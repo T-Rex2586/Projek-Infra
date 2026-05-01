@@ -1,26 +1,17 @@
 FROM apache/airflow:2.8.1-python3.10
 
-# ✅ Install system dependencies untuk Playwright Chromium headless
-# Perlu root untuk apt-get dan playwright install
 USER root
 
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-        # Glib & DBus (wajib untuk Chromium)
         libglib2.0-0 \
         libdbus-1-3 \
-        # NSS (Network Security Services)
         libnss3 \
-        # ATK Accessibility
         libatk1.0-0 \
         libatk-bridge2.0-0 \
-        # CUPS (printing)
         libcups2 \
-        # DRM (Direct Rendering Manager)
         libdrm2 \
-        # XKB (keyboard)
         libxkbcommon0 \
-        # X11 core libs
         libx11-6 \
         libx11-xcb1 \
         libxcb1 \
@@ -33,26 +24,19 @@ RUN apt-get update -qq && \
         libxi6 \
         libxtst6 \
         libxshmfence1 \
-        # GBM (Generic Buffer Management)
         libgbm1 \
-        # Pango (text rendering)
         libpangocairo-1.0-0 \
         libpangoft2-1.0-0 \
-        # ALSA (audio, needed by some Chromium builds)
         libasound2 \
-        # Fonts
         fonts-liberation \
         fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/*
 
-# ✅ Siapkan folder Playwright dengan permission yang benar sebelum ganti user
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN mkdir -p /opt/ms-playwright && \
     chmod -R 777 /opt/ms-playwright
 
-# ✅ Switch ke user airflow untuk install pip packages
 USER airflow
 
-# Install Python packages dan Playwright browser sebagai user airflow
 RUN pip install --no-cache-dir scrapy>=2.11.0 scrapy-playwright playwright itemadapter brotlicffi>=1.2.0 && \
     playwright install chromium

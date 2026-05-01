@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class KarirSpiderJson(scrapy.Spider):
     name = 'karir'
     BASE_URL = 'https://gateway2-beta.karir.com/v2/search/opportunities'
-    LIMIT = 20  # Naikkan dari 10 ke 20
-    MAX_OFFSET = 200  # Naikkan dari 100
+    LIMIT = 20
+    MAX_OFFSET = 200
 
     custom_settings = {
         'ROBOTSTXT_OBEY': False,
@@ -70,8 +70,7 @@ class KarirSpiderJson(scrapy.Spider):
     def parse(self, response):
         try:
             data = json.loads(response.text)
-            
-            # Safe navigation
+
             data_obj = data.get('data', {})
             if not data_obj:
                 logger.error(f"Karir: No 'data' in response. Keys: {list(data.keys())}")
@@ -87,11 +86,9 @@ class KarirSpiderJson(scrapy.Spider):
             logger.info(f"Karir: Got {len(opportunities)} jobs (total: {total_opportunities})")
 
             for opp in opportunities:
-                # Langsung parse dari search results tanpa detail page
-                # Karena Next.js build ID berubah setiap deploy, detail page terlalu rapuh
+
                 yield self.parse_job_from_search(opp)
 
-            # Pagination
             current_offset = json.loads(response.request.body).get('offset', 0)
             next_offset = current_offset + self.LIMIT
 
@@ -122,8 +119,7 @@ class KarirSpiderJson(scrapy.Spider):
         job_position = job.get('job_position', 'N/A')
         company_name = job.get('company_name', 'Unknown')
         location = job.get('location', 'Indonesia')
-        
-        # Extract info yang tersedia
+
         job_functions = job.get('job_functions', [])
         if isinstance(job_functions, list):
             department = ' - '.join(job_functions) if job_functions else 'N/A'
@@ -132,10 +128,8 @@ class KarirSpiderJson(scrapy.Spider):
             department = str(job_functions) if job_functions else 'N/A'
             functions_text = str(job_functions)
 
-        # Build desc from available data
         full_text_desc = f"{job_position} {functions_text} {company_name}"
 
-        # Salary
         salary = '0'
         salary_lower = job.get('salary_lower')
         salary_upper = job.get('salary_upper')

@@ -4,7 +4,6 @@ x-airflow-common: &airflow-common
   build:
     context: .
     dockerfile: Dockerfile.airflow
-
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
@@ -13,27 +12,22 @@ x-airflow-common: &airflow-common
 
     AIRFLOW_CONN_DWH_CONN: postgresql://airflow:airflow@postgres-dwh:5432/dwh
 
-    _PIP_ADDITIONAL_REQUIREMENTS: pandas>=2.0.0 requests>=2.31.0 psycopg2-binary>=2.9.9
+    AIRFLOW__CORE__PARALLELISM: "4"
+    AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "2"
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "60"
 
     PLAYWRIGHT_BROWSERS_PATH: /opt/ms-playwright
-
-    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
-    AIRFLOW__CORE__PARALLELISM: "16"
-    AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "16"
 
   volumes:
     - ./dags:/opt/airflow/dags
     - ./data:/opt/airflow/data
     - ./freya:/opt/airflow/freya
-
+  user: "${AIRFLOW_UID:-5000}:0"
   depends_on:
     postgres:
       condition: service_healthy
 
-
 services:
-
-  # 🗄️ AIRFLOW METADATA DB
   postgres:
     image: postgres:13
     environment:
@@ -42,15 +36,15 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5431:5432"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
-
-  # 🗄️ DATA WAREHOUSE DB
   postgres-dwh:
     image: postgres:13
     environment:
@@ -66,45 +60,43 @@ services:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
-
-  # ⚙️ AIRFLOW INIT (FIXED 100%)
   airflow-init:
     <<: *airflow-common
     command: >
       bash -c "
-      echo '⏳ Waiting DB...' &&
-      sleep 10 &&
       airflow db migrate &&
-
-      echo '👤 Creating admin user...' &&
       airflow users create --username admin --password admin \
-      --firstname Admin --lastname User \
-      --role Admin --email admin@example.com || true &&
-
-      echo '✅ Airflow init done'
+      --firstname Admin --lastname User --role Admin --email admin@example.com || true
       "
 
-
-  # 🌐 WEB SERVER
   airflow-webserver:
     <<: *airflow-common
     command: webserver
     ports:
-      - "8089:8080"
-    depends_on:
-      - airflow-init
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-
-  # 🧠 SCHEDULER
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
-    depends_on:
-      - airflow-init
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-
-  # 📊 METABASE
   metabase:
     image: metabase/metabase:latest
     ports:
@@ -113,10 +105,13 @@ services:
       - metabase_data:/metabase-data
     environment:
       MB_DB_FILE: /metabase-data/metabase.db
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     depends_on:
       postgres-dwh:
         condition: service_healthy
-
 
 volumes:
   postgres_data:

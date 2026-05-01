@@ -7,12 +7,11 @@ from freya.utils import calculate_job_apply_end_date
 
 logger = logging.getLogger(__name__)
 
-
 class VidioSpiderXPath(scrapy.Spider):
     name = 'vidio'
     BASE_URL = 'https://careers.vidio.com'
     CAREERS_URL = f"{BASE_URL}/careers"
-    # Vidio uses Greenhouse
+
     GREENHOUSE_URL = 'https://api.greenhouse.io/v1/boards/vidio/jobs?content=true'
 
     custom_settings = {
@@ -46,13 +45,13 @@ class VidioSpiderXPath(scrapy.Spider):
             meta={
                 "playwright": True,
                 "playwright_page_methods": [
-                    scrapy.Request.__class__  # placeholder, see below
+                    scrapy.Request.__class__
                 ],
             },
             callback=self.parse_playwright,
         )
 
-    def errback_greenhouse(self, failure):  # noqa: F811
+    def errback_greenhouse(self, failure):
         logger.warning(f"Vidio Greenhouse API failed: {failure}")
         yield scrapy.Request(
             self.CAREERS_URL,
@@ -116,7 +115,7 @@ class VidioSpiderXPath(scrapy.Spider):
     def parse_playwright(self, response):
         """Playwright fallback for Vidio careers page."""
         try:
-            # Try multiple selectors - Vidio careers page structure
+
             selectors_to_try = [
                 'div[class*="b-job"] a',
                 'div.career-item a',
@@ -133,7 +132,7 @@ class VidioSpiderXPath(scrapy.Spider):
                     break
 
             if not cards:
-                # XPath fallback
+
                 cards = response.xpath('//div[contains(@class, "job")]//a | //li[contains(@class, "job")]//a')
                 logger.info(f"Vidio Playwright XPath: Found {len(cards)} elements")
 

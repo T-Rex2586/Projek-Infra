@@ -5,7 +5,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 def calculate_job_age(first_seen, last_seen):
     try:
         if not first_seen or not last_seen:
@@ -23,11 +22,10 @@ def calculate_job_age(first_seen, last_seen):
     except (ValueError, TypeError):
         return 'unknown'
 
-
 class FreyaPipeline:
     """
     Pipeline utama Freya.
-    ✅ Fix Scrapy 2.15 DeprecationWarning:
+     Fix Scrapy 2.15 DeprecationWarning:
        - open_spider / close_spider / process_item TIDAK boleh punya 'spider' param
          jika tidak digunakan dari from_crawler
     """
@@ -38,7 +36,6 @@ class FreyaPipeline:
         instance.stats = crawler.stats
         return instance
 
-    # ✅ Tanpa 'spider' parameter — fix DeprecationWarning
     def open_spider(self):
         logger.info("FreyaPipeline: Spider opened")
 
@@ -48,12 +45,10 @@ class FreyaPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
 
-        # Hitung job_age
         first_seen = adapter.get('first_seen', '')
         last_seen  = adapter.get('last_seen', '')
         adapter['job_age'] = calculate_job_age(first_seen, last_seen) if (first_seen and last_seen) else 'unknown'
 
-        # Validasi minimal
         if adapter.get('platform'):
             if not adapter.get('url'):
                 raise DropItem(f"[{spider.name}] Missing url: title={adapter.get('course_title')}")
