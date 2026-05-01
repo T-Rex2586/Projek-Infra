@@ -6,18 +6,27 @@ from datetime import datetime
 class DicodingSpider(scrapy.Spider):
     name = "dicoding"
     allowed_domains = ["dicoding.com"]
-    start_urls = ["https://www.dicoding.com/academies/list"]
 
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
-        "DOWNLOAD_DELAY": 1,
+        "DOWNLOAD_DELAY": 2,
+        "CONCURRENT_REQUESTS": 1,
     }
 
-    def parse(self, response):
-        cards = response.css("a[href*='/academies/']")
+    def start_requests(self):
+        yield scrapy.Request(
+            url="https://www.dicoding.com/academies/list",
+            meta={
+                "playwright": True,
+                "playwright_page_goto_kwargs": {"wait_until": "networkidle"},
+            },
+            callback=self.parse,
+        )
 
+    def parse(self, response):
         seen_urls = set()
-        for card in cards:
+
+        for card in response.css("a[href*='/academies/']"):
             url = card.attrib.get("href", "")
             if not re.search(r"/academies/\d+", url):
                 continue
@@ -33,9 +42,9 @@ class DicodingSpider(scrapy.Spider):
                 .strip()
             )
             if not title:
-                title = card.css("*::text").getall()
+                all_texts = card.css("*::text").getall()
                 title = next(
-                    (t.strip() for t in title if len(t.strip()) > 10),
+                    (t.strip() for t in all_texts if len(t.strip()) > 10),
                     "N/A",
                 )
 
