@@ -1,4 +1,5 @@
 import scrapy
+import json
 from datetime import datetime
 
 
@@ -7,42 +8,44 @@ class DicodingSpider(scrapy.Spider):
     allowed_domains = ["dicoding.com"]
 
     custom_settings = {
+        "DOWNLOAD_DELAY": 2,
+        "CONCURRENT_REQUESTS": 1,
         "ROBOTSTXT_OBEY": False,
-        "DOWNLOAD_DELAY": 1,
-        "CONCURRENT_REQUESTS": 2,
     }
 
-    BASE_URL = "https://www.dicoding.com/public/api/academies"
-
     def start_requests(self):
-        # mulai dari page 1
         yield scrapy.Request(
-            url=f"{self.BASE_URL}?page=1",
-            headers=self.get_headers(),
+            url="https://www.dicoding.com/academies",
+            meta={
+                "playwright": True,
+                "playwright_include_page": True,
+            },
             callback=self.parse,
-            meta={"page": 1},
         )
 
-    def get_headers(self):
-        return {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Accept": "application/json",
-            "Referer": "https://www.dicoding.com/",
+    async def parse(self, response):
+        page = response.meta["playwright_page"]
+
+        await page.wait_for_load_state("networkidle")
+
+        content = await page.content()
+
+        data = await page.evaluate("""
+        () => {
+            return window.__NEXT_DATA__;
         }
+        """)
 
-    def parse(self, response):
-        page = response.meta.get("page", 1)
+        await page.close()
 
-        try:
-            data = response.json()
-        except Exception:
-            self.logger.error("Gagal parse JSON")
+        if not data:
+            self.logger.error("Gagal ambil NEXT_DATA")
             return
 
-        courses = data.get("data", [])
-
-        if not courses:
-            self.logger.info(f"Halaman {page} kosong, stop crawling")
+        try:
+            courses = data["props"]["pageProps"]["initialData"]["data"]
+        except Exception as e:
+            self.logger.error(f"Struktur berubah: {e}")
             return
 
         for course in courses:
@@ -57,11 +60,3 @@ class DicodingSpider(scrapy.Spider):
                 "url": f"https://www.dicoding.com/academies/{course.get('id')}",
                 "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
-
-        next_page = page + 1
-        yield scrapy.Request(
-            url=f"{self.BASE_URL}?page={next_page}",
-            headers=self.get_headers(),
-            callback=self.parse,
-            meta={"page": next_page},
-        )
