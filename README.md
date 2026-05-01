@@ -1,12 +1,12 @@
 # Projek-Infra: End-to-End Job & EdTech Data Pipeline
 
-## 🚀 Overview
+## Overview
 
 **Projek-Infra** is an automated, end-to-end Data Engineering pipeline built to scrape, process, and visualize job vacancies and IT course data across various platforms in Indonesia. 
 
 The pipeline runs on a scheduled basis, extracts data using highly concurrent web scrapers, loads it into a persistent Data Warehouse, and provides a Business Intelligence layer to visualize insights such as top hiring companies, in-demand skills, and salary distributions.
 
-## 🏗️ Architecture & Tech Stack
+## Architecture & Tech Stack
 
 This project implements a modern data stack orchestrated completely within Docker:
 
@@ -16,7 +16,7 @@ This project implements a modern data stack orchestrated completely within Docke
 - **Business Intelligence**: Metabase
 - **Containerization**: Docker & Docker Compose
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 Projek-Infra/
@@ -32,7 +32,7 @@ Projek-Infra/
 └── README.md               # Project documentation
 ```
 
-## 🕸️ Data Sources (Spiders)
+## Data Sources (Spiders)
 
 The Scrapy project (`freya`) is equipped with spiders for multiple platforms, including but not limited to:
 - **Job Boards**: JobStreet, Glints, TechInAsia, Dealls, Kalibrr, Karir, KitaLulus, LokerID, TopKarir, etc.
@@ -41,7 +41,7 @@ The Scrapy project (`freya`) is equipped with spiders for multiple platforms, in
 
 *Note: The pipeline uses Playwright to render JavaScript-heavy websites.*
 
-## 📊 Data Warehouse Schema
+## Data Warehouse Schema
 
 The PostgreSQL Data Warehouse (`dwh`) is initialized with the following core tables:
 1. `job_vacancies` - Stores job details (title, company, location, salary, setup, etc.)
@@ -50,7 +50,7 @@ The PostgreSQL Data Warehouse (`dwh`) is initialized with the following core tab
 
 Several **Views** are also created automatically for Metabase dashboards, such as `v_top_skills`, `v_jobs_by_source`, `v_top_companies`, and `v_salary_distribution`.
 
-## ⚙️ Getting Started
+## Getting Started
 
 ### Prerequisites
 - [Docker](https://docs.docker.com/get-docker/)
@@ -93,7 +93,7 @@ Once everything is up and running, you can access the following interfaces:
   - **User:** `airflow`
   - **Password:** `airflow`
 
-## 🛑 Troubleshooting
+## Troubleshooting
 
 - **Missing DAGs in Airflow:** Ensure the scheduler is running and the `dags` folder is properly mapped in `docker-compose.yaml`.
 - **Playwright/Scraper Errors:** The pipeline requires Playwright browsers to be installed. This is handled during the `airflow-init` phase. If scraping fails, verify that the Playwright cache is successfully mounted.
