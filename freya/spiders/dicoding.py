@@ -1,5 +1,5 @@
 import scrapy
-import json
+import re
 from datetime import datetime
 
 
@@ -8,14 +8,19 @@ class DicodingSpider(scrapy.Spider):
     allowed_domains = ["dicoding.com"]
 
     custom_settings = {
+        "ROBOTSTXT_OBEY": False,
         "DOWNLOAD_DELAY": 2,
         "CONCURRENT_REQUESTS": 1,
-        "ROBOTSTXT_OBEY": False,
+        "PLAYWRIGHT_BROWSER_TYPE": "chromium",
     }
 
-    def start_requests(self):
+    async def start(self):
         yield scrapy.Request(
-            url="https://www.dicoding.com/academies",
+            url="https://www.dicoding.com/academies/list",
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
             meta={
                 "playwright": True,
                 "playwright_include_page": True,
@@ -26,37 +31,52 @@ class DicodingSpider(scrapy.Spider):
     async def parse(self, response):
         page = response.meta["playwright_page"]
 
-        await page.wait_for_load_state("networkidle")
+        # tunggu card muncul
+        await page.wait_for_selector("a[href*='/academies/']", timeout=15000)
 
         content = await page.content()
-
-        data = await page.evaluate("""
-        () => {
-            return window.__NEXT_DATA__;
-        }
-        """)
-
         await page.close()
 
-        if not data:
-            self.logger.error("Gagal ambil NEXT_DATA")
-            return
+        response = response.replace(body=content)
 
-        try:
-            courses = data["props"]["pageProps"]["initialData"]["data"]
-        except Exception as e:
-            self.logger.error(f"Struktur berubah: {e}")
-            return
+        seen_urls = set()
 
-        for course in courses:
+        for card in response.css("a[href*='/academies/']"):
+            url = card.attrib.get("href", "")
+
+            if not re.search(r"/academies/\d+", url):
+                continue
+
+            if not url.startswith("http"):
+                url = f"https://www.dicoding.com{url}"
+
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+
+            title = (
+                card.css("h5::text, strong::text")
+                .get(default="")
+                .strip()
+            )
+
+            if not title:
+                title = "N/A"
+
+            level = card.css("[class*='level']::text").get(default="N/A").strip()
+            duration = card.css("[class*='duration']::text").get(default="N/A").strip()
+            rating = card.css("[class*='rating']::text").get(default="N/A").strip()
+            students = card.css("[class*='student']::text").get(default="N/A").strip()
+            desc = card.css("p::text").get(default="").strip()
+
             yield {
-                "course_title": course.get("name", "N/A"),
-                "desc": course.get("summary", "N/A"),
-                "level": course.get("level", "N/A"),
-                "duration": course.get("estimated_time", "N/A"),
-                "rating": course.get("rating", "N/A"),
-                "students": course.get("students_count", "N/A"),
+                "course_title": title,
+                "desc": desc,
+                "level": level,
+                "duration": duration,
+                "rating": rating,
+                "students": students,
                 "platform": "Dicoding",
-                "url": f"https://www.dicoding.com/academies/{course.get('id')}",
+                "url": url,
                 "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
