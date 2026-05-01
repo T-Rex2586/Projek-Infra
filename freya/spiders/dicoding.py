@@ -11,6 +11,7 @@ class DicodingSpider(scrapy.Spider):
         "ROBOTSTXT_OBEY": False,
         "DOWNLOAD_DELAY": 2,
         "CONCURRENT_REQUESTS": 1,
+        "HTTPERROR_ALLOWED_CODES": [405],
     }
 
     def start_requests(self):
