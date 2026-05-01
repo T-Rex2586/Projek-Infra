@@ -7,6 +7,8 @@ class DicodingSpider(scrapy.Spider):
     name = "dicoding"
     allowed_domains = ["dicoding.com"]
 
+    handle_httpstatus_list = [405]
+
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
         "DOWNLOAD_DELAY": 2,
