@@ -1,5 +1,4 @@
 import scrapy
-import re
 from datetime import datetime
 
 
@@ -9,74 +8,60 @@ class DicodingSpider(scrapy.Spider):
 
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
-        "DOWNLOAD_DELAY": 2,
-        "CONCURRENT_REQUESTS": 1,
-        "HTTPERROR_ALLOWED_CODES": [405],
+        "DOWNLOAD_DELAY": 1,
+        "CONCURRENT_REQUESTS": 2,
     }
 
+    BASE_URL = "https://www.dicoding.com/public/api/academies"
+
     def start_requests(self):
+        # mulai dari page 1
         yield scrapy.Request(
-            url="https://www.dicoding.com/academies/list",
-            meta={
-                "playwright": True,
-                "playwright_page_goto_kwargs": {"wait_until": "networkidle"},
-            },
+            url=f"{self.BASE_URL}?page=1",
+            headers=self.get_headers(),
             callback=self.parse,
+            meta={"page": 1},
         )
 
+    def get_headers(self):
+        return {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept": "application/json",
+            "Referer": "https://www.dicoding.com/",
+        }
+
     def parse(self, response):
-        seen_urls = set()
+        page = response.meta.get("page", 1)
 
-        for card in response.css("a[href*='/academies/']"):
-            url = card.attrib.get("href", "")
-            if not re.search(r"/academies/\d+", url):
-                continue
-            if not url.startswith("http"):
-                url = f"https://www.dicoding.com{url}"
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
+        try:
+            data = response.json()
+        except Exception:
+            self.logger.error("Gagal parse JSON")
+            return
 
-            title = (
-                card.css("h5::text, .course-card__title::text, strong::text")
-                .get(default="")
-                .strip()
-            )
-            if not title:
-                all_texts = card.css("*::text").getall()
-                title = next(
-                    (t.strip() for t in all_texts if len(t.strip()) > 10),
-                    "N/A",
-                )
+        courses = data.get("data", [])
 
-            level = card.css(
-                ".course-card__level::text, [class*='level']::text"
-            ).get(default="N/A").strip()
+        if not courses:
+            self.logger.info(f"Halaman {page} kosong, stop crawling")
+            return
 
-            duration = card.css(
-                ".course-card__duration::text, [class*='duration']::text"
-            ).get(default="N/A").strip()
-
-            rating = card.css(
-                ".course-card__rating::text, [class*='rating']::text"
-            ).get(default="N/A").strip()
-
-            students = card.css(
-                "[class*='student']::text, [class*='member']::text"
-            ).get(default="N/A").strip()
-
-            desc = card.css(
-                ".course-card__desc::text, [class*='desc']::text, p::text"
-            ).get(default="").strip()
-
+        for course in courses:
             yield {
-                "course_title": title,
-                "desc": desc,
-                "level": level,
-                "duration": duration,
-                "rating": rating,
-                "students": students,
+                "course_title": course.get("name", "N/A"),
+                "desc": course.get("summary", "N/A"),
+                "level": course.get("level", "N/A"),
+                "duration": course.get("estimated_time", "N/A"),
+                "rating": course.get("rating", "N/A"),
+                "students": course.get("students_count", "N/A"),
                 "platform": "Dicoding",
-                "url": url,
+                "url": f"https://www.dicoding.com/academies/{course.get('id')}",
                 "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
+
+        next_page = page + 1
+        yield scrapy.Request(
+            url=f"{self.BASE_URL}?page={next_page}",
+            headers=self.get_headers(),
+            callback=self.parse,
+            meta={"page": next_page},
+        )
