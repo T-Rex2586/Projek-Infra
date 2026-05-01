@@ -1,4 +1,3 @@
-version: '3.8'
 
 x-airflow-common: &airflow-common
   build:
@@ -6,15 +5,18 @@ x-airflow-common: &airflow-common
     dockerfile: Dockerfile.airflow
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres:5432/${AIRFLOW_DB_NAME}
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-    AIRFLOW__WEBSERVER__SECRET_KEY: my_super_secret_key_123
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
 
-    AIRFLOW_CONN_DWH_CONN: postgresql://airflow:airflow@postgres-dwh:5432/dwh
+    AIRFLOW_CONN_DWH_CONN: postgresql://${DWH_DB_USER}:${DWH_DB_PASSWORD}@postgres-dwh:5432/${DWH_DB_NAME}
 
     AIRFLOW__CORE__PARALLELISM: "4"
     AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "2"
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "60"
+
+    AIRFLOW__WEBSERVER__WORKERS: "2"
+    AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT: "300"
 
     PLAYWRIGHT_BROWSERS_PATH: /opt/ms-playwright
 
@@ -26,59 +28,67 @@ x-airflow-common: &airflow-common
   depends_on:
     postgres:
       condition: service_healthy
+  networks:
+    - infra-net
+  restart: unless-stopped
 
 services:
   postgres:
     image: postgres:13
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "${AIRFLOW_DB_USER}"]
       interval: 5s
       retries: 5
     deploy:
       resources:
         limits:
           memory: 256M
+    networks:
+      - infra-net
+    restart: unless-stopped
 
   postgres-dwh:
     image: postgres:13
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: dwh
+      POSTGRES_USER: ${DWH_DB_USER}
+      POSTGRES_PASSWORD: ${DWH_DB_PASSWORD}
+      POSTGRES_DB: ${DWH_DB_NAME}
     volumes:
       - postgres_dwh_data:/var/lib/postgresql/data
       - ./dwh_init:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "${DWH_DB_USER}"]
       interval: 5s
       retries: 5
     deploy:
       resources:
         limits:
           memory: 256M
+    networks:
+      - infra-net
+    restart: unless-stopped
 
   airflow-init:
     <<: *airflow-common
     command: >
       bash -c "
       airflow db migrate &&
-      airflow users create --username admin --password admin \
+      airflow users create --username ${AIRFLOW_ADMIN_USER} --password ${AIRFLOW_ADMIN_PASSWORD} \
       --firstname Admin --lastname User --role Admin --email admin@example.com || true
       "
+    restart: "no"
 
   airflow-webserver:
     <<: *airflow-common
     command: webserver
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -87,7 +97,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   airflow-scheduler:
     <<: *airflow-common
@@ -95,10 +105,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   metabase:
-    image: metabase/metabase:latest
+    image: metabase/metabase:v0.52.6
     ports:
       - "3010:3000"
     volumes:
@@ -108,10 +118,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
     depends_on:
       postgres-dwh:
         condition: service_healthy
+    networks:
+      - infra-net
+    restart: unless-stopped
+
+networks:
+  infra-net:
+    driver: bridge
 
 volumes:
   postgres_data:

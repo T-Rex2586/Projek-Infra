@@ -68,6 +68,10 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+# Docker volumes / local data
+metabase-data/
+data/
+
 # Sphinx documentation
 docs/_build/
 
