@@ -62,6 +62,8 @@ services:
     volumes:
       - postgres_dwh_data:/var/lib/postgresql/data
       - ./dwh_init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${DWH_DB_USER}"]
       interval: 5s
